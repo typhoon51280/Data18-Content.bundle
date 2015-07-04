@@ -141,6 +141,10 @@ class EXCAgent(Agent.Movies):
 
     Log('Searching for Title: ' + title)
 
+    if " in " in title.lower():
+      search_na(results, title, year, lang)
+
+
     if len(results) == 0:
       #query = String.URLEncode(String.StripDiacritics(title.replace('-','')))
       query = String.URLEncode(String.StripDiacritics(title))
@@ -150,7 +154,7 @@ class EXCAgent(Agent.Movies):
       searchResults = HTML.ElementFromURL(searchUrl)
       searchTitle = searchResults.xpath('//title')[0].text_content()
       count = 0
-      for movie in searchResults.xpath('//div[@class="gen"]//p[@class="gen12"]//a[contains(@href,"content")]'):
+      for movie in searchResults.xpath('//div[@class="gen"]//span//a[contains(@href,"content")]'):
         movieHREF = movie.get("href").strip()
         Log('MovieHREF: ' + movieHREF)
         curName = movie.text_content().strip()
@@ -324,7 +328,7 @@ class EXCAgent(Agent.Movies):
       Log('Art -Embedded Video- Sequence Updated')
     except: pass
 
- # Get First Photo Set Pic if available
+    # Get First Photo Set Pic if available
     try:
       photoSetIndex = 0
       imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
