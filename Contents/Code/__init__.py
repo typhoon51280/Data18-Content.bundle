@@ -54,77 +54,74 @@ def search_na(results, media_title, year, lang):
     Log('Search URL: ' + searchURL)
     search_results = HTML.ElementFromURL(searchURL)
 
+  NAsearchURL = None
   try:
-    searchURL = find_option_value(searchURL, search_results, na_url_site)
+    NAsearchURL = find_option_value(searchURL, search_results, na_url_site)
   except:
     try:
-      searchURL = find_option_value(searchURL, search_results, re.sub(r'[\'\"]', '', na_url_site))
+      NAsearchURL = find_option_value(searchURL, search_results, re.sub(r'[\'\"]', '', na_url_site))
     except:
       try:
         search_results = HTML.ElementFromURL(searchURL + '/sites/')
         xp = xpath_prepare('//a[text()[contains(translate(., "$u", "$l"), "$s")]]//@href', na_url_site)
         Log('xPath: ' + xp)
-        searchURL = search_results.xpath(xp)[0]
+        NAsearchURL = search_results.xpath(xp)[0]
       except:
         Log('Alternative search for N.A. website found nothing (false positive match)')
-        return
-      
-  search_results = HTML.ElementFromURL(searchURL)
+        pass
+  
+  if NAsearchURL is not None:
 
+    Log('Search URL: ' + NAsearchURL)
+    search_results = HTML.ElementFromURL(NAsearchURL)
 
-  #searchURL = EXC_BASEURL + query_actor + '/sites/' + na_url_part + '.html'
-  Log('Search URL: ' + searchURL)
-  #try:
-    #search_results = HTML.ElementFromURL(searchURL)
-  #except:
-    #searchURL = EXC_BASEURL +'dev/' + query_actor + '/sites/' + na_url_part + '.html'
-    #search_results = HTML.ElementFromURL(searchURL)
-  count = 0
-  for movie in search_results.xpath('//div[@class="bscene2 genmed"]//p[@class="line1"]//a[@class="gen11 bold"]'):
-    movie_HREF = movie.get("href").strip()
-    Log('Movie HREF: ' + movie_HREF)
-    current_name = movie.text_content().strip()
-    Log('New title: ' + current_name)
-    current_ID = movie.get('href').split('/',4)[4]
-    Log('New ID: ' + current_ID)
+    count = 0
+    for movie in search_results.xpath('//div[@class="bscene2 genmed"]//p[@class="line1"]//a[@class="gen11 bold"]'):
+      movie_HREF = movie.get("href").strip()
+      Log('Movie HREF: ' + movie_HREF)
+      current_name = movie.text_content().strip()
+      Log('New title: ' + current_name)
+      current_ID = movie.get('href').split('/',4)[4]
+      Log('New ID: ' + current_ID)
 
-    try:
-      movieResults = HTML.ElementFromURL(movie_HREF)
+      try:
+        movieResults = HTML.ElementFromURL(movie_HREF)
       curyear = movieResults.xpath('//p[text()[contains(translate(.,"relasdt","RELASDT"),"RELEASE DATE")]]//a')[0].get('href')
-      curyear_group = re.search(r'(\d{8})',curyear)
-      if curyear_group is None:
-        Log('Date: No date found')
+        curyear_group = re.search(r'(\d{8})',curyear)
+        if curyear_group is None:
+          Log('Date: No date found')
+          score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower())
+          curyear = ''
+          curdate = ''
+        else:
+          curdate = curyear_group.group(0)
+          curdate = Datetime.ParseDate(curdate).date()
+          curyear = str(curdate.year)
+          curmonth = str(curdate.month)
+          curday = str(curdate.day)
+          curdate = str(curdate)
+          Log('Found Date = ' + curdate)
+          score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower()) - Util.LevenshteinDistance(year, curyear)
+          Log('It Worked ************************************************************')
+      except (IndexError):
         score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower())
         curyear = ''
         curdate = ''
-      else:
-        curdate = curyear_group.group(0)
-        curdate = Datetime.ParseDate(curdate).date()
-        curyear = str(curdate.year)
-        curmonth = str(curdate.month)
-        curday = str(curdate.day)
-        curdate = str(curdate)
-        Log('Found Date = ' + curdate)
-        score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower()) - Util.LevenshteinDistance(year, curyear)
-        Log('It Worked ************************************************************')
-    except (IndexError):
-      score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower())
-      curyear = ''
-      curdate = ''
-      Log('Date: No date found (Exception)')
-    if score >= 45:
-      if current_name.count(', The'):
-        current_name = 'The ' + current_name.replace(', The','',1)
-      if curdate:
-        current_name = current_name + ' [' + curdate + ']'
+        Log('Date: No date found (Exception)')
+      if score >= 45:
+        if current_name.count(', The'):
+          current_name = 'The ' + current_name.replace(', The','',1)
+        if curdate:
+          current_name = current_name + ' [' + curdate + ']'
 
-      Log('Found:')
-      Log('    Date: ' + curdate)
-      Log('    ID: ' + current_ID)
-      Log('    Title: ' + current_name)
-      Log('    URL: ' + movie_HREF)
-      results.Append(MetadataSearchResult(id = current_ID, name = current_name, score = score, lang = lang))
-    count += 1
+        Log('Found:')
+        Log('    Date: ' + curdate)
+        Log('    ID: ' + current_ID)
+        Log('    Title: ' + current_name)
+        Log('    URL: ' + movie_HREF)
+        results.Append(MetadataSearchResult(id = current_ID, name = current_name, score = score, lang = lang))
+      count += 1
+      
   results.Sort('score', descending=True)
 
 
@@ -159,8 +156,10 @@ class EXCAgent(Agent.Movies):
 
     Log('Searching for Title: ' + title)
     if " in " in title.lower() and not content_id:
-      search_na(results, title, year, lang)
-
+      try:
+        search_na(results, title, year, lang)
+      except:
+        pass
 
     if len(results) == 0:
       #query = String.URLEncode(String.StripDiacritics(title.replace('-','')))
